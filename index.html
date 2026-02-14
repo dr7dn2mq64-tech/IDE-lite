@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate IDE - AI协作编程</title>
+    <title>Ultimate IDE - AI协作编程环境</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
@@ -17,8 +17,7 @@
             --accent-cyan: #00f0ff;
             --accent-purple: #b829dd;
             --accent-green: #00ff9d;
-            --accent-red: #ff4444;
-            --border-color: #2a2a3a;
+            --accent-orange: #ff6b35;
         }
         
         body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: #e0e0e0; overflow: hidden; }
@@ -26,112 +25,122 @@
         
         .message-user { background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(0, 240, 255, 0.05)); border: 1px solid rgba(0, 240, 255, 0.3); }
         .message-ai { background: linear-gradient(135deg, rgba(184, 41, 221, 0.15), rgba(184, 41, 221, 0.05)); border: 1px solid rgba(184, 41, 221, 0.3); }
-        .message-system { background: rgba(255, 107, 53, 0.15); border: 1px solid rgba(255, 107, 53, 0.3); }
-        .message-action { background: rgba(0, 255, 157, 0.15); border: 1px solid rgba(0, 255, 157, 0.3); }
-        
-        .typing-indicator span { animation: blink 1.4s infinite both; display: inline-block; width: 6px; height: 6px; background: var(--accent-cyan); border-radius: 50%; margin: 0 2px; }
-        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+        .message-consensus { background: linear-gradient(135deg, rgba(0, 255, 157, 0.2), rgba(0, 255, 157, 0.1)); border: 2px solid rgba(0, 255, 157, 0.5); box-shadow: 0 0 20px rgba(0, 255, 157, 0.2); }
         
         .scroll-hide::-webkit-scrollbar { width: 6px; height: 6px; }
-        .scroll-hide::-webkit-scrollbar-track { background: transparent; }
         .scroll-hide::-webkit-scrollbar-thumb { background: #3a3a4a; border-radius: 3px; }
         
-        .diff-added { background: rgba(0, 255, 157, 0.2); color: #00ff9d; }
-        .diff-removed { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+        .ai-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; }
         
-        .ai-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .discussion-thread { border-left: 2px solid #2a2a3a; margin-left: 16px; padding-left: 16px; }
+        .discussion-thread.active { border-left-color: var(--accent-cyan); }
         
-        .config-card { transition: all 0.2s; cursor: pointer; }
-        .config-card:hover { transform: translateX(4px); border-color: rgba(0, 240, 255, 0.5); }
+        .typing-indicator span { animation: blink 1.4s infinite both; display: inline-block; width: 6px; height: 6px; background: var(--accent-cyan); border-radius: 50%; margin: 0 2px; }
+        @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
         
-        .code-block { background: #0f0f15; border: 1px solid #2a2a3a; border-radius: 6px; padding: 8px; margin: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; overflow-x: auto; }
+        .preview-container { background: white; color: black; }
         
-        .btn-accept { background: rgba(0, 255, 157, 0.2); border: 1px solid rgba(0, 255, 157, 0.5); color: #00ff9d; }
-        .btn-accept:hover { background: rgba(0, 255, 157, 0.3); }
-        .btn-reject { background: rgba(255, 68, 68, 0.2); border: 1px solid rgba(255, 68, 68, 0.5); color: #ff4444; }
-        .btn-reject:hover { background: rgba(255, 68, 68, 0.3); }
+        .language-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(0, 240, 255, 0.1); color: var(--accent-cyan); border: 1px solid rgba(0, 240, 255, 0.3); }
         
-        .discussion-bubble { border-radius: 12px; padding: 12px; margin: 4px 0; }
+        .turn-counter { font-size: 10px; background: rgba(255, 255, 255, 0.1); padding: 2px 8px; border-radius: 12px; }
     </style>
 </head>
 <body class="h-screen flex flex-col text-sm">
 
     <!-- 顶部 -->
     <header class="h-12 bg-[#0f0f15] border-b border-[#2a2a3a] flex items-center justify-between px-4 z-50">
-        <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
-                <i class="fas fa-cube text-cyan-400 text-xl"></i>
-                <span class="font-bold text-lg bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">AI协作IDE</span>
-            </div>
-            <button onclick="app.runCode()" class="px-4 py-1.5 bg-cyan-500/20 border border-cyan-500/30 rounded flex items-center gap-2 hover:bg-cyan-500/30">
-                <i class="fas fa-play text-green-400"></i> 运行
+        <div class="flex items-center gap-3">
+            <i class="fas fa-cube text-cyan-400 text-xl"></i>
+            <span class="font-bold text-lg bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">Ultimate IDE</span>
+            <div class="h-6 w-px bg-[#2a2a3a] mx-2"></div>
+            <button onclick="app.newFile()" class="px-3 py-1.5 hover:bg-white/5 rounded flex items-center gap-2">
+                <i class="fas fa-file-plus text-cyan-400"></i> 新建
+            </button>
+            <button onclick="app.saveFile()" class="px-3 py-1.5 hover:bg-white/5 rounded flex items-center gap-2" id="saveBtn">
+                <i class="fas fa-save text-green-400"></i> 保存
+                <span id="saveDot" class="hidden w-2 h-2 bg-orange-400 rounded-full ml-1"></span>
+            </button>
+            <button onclick="app.togglePreview()" class="px-3 py-1.5 hover:bg-white/5 rounded flex items-center gap-2">
+                <i class="fas fa-eye text-purple-400"></i> 预览
             </button>
         </div>
         
         <div class="flex items-center gap-3">
-            <select id="languageSelect" onchange="app.changeLanguage(this.value)" class="bg-[#1a1a23] border border-[#2a2a3a] rounded px-3 py-1.5 text-xs code-font">
-                <option value="javascript">JavaScript</option>
-                <option value="python">Python</option>
-                <option value="java">Java</option>
-                <option value="cpp">C++</option>
-                <option value="go">Go</option>
+            <select id="languageSelect" onchange="app.changeLanguage(this.value)" class="bg-[#1a1a23] border border-[#2a2a3a] rounded px-3 py-1.5 text-xs code-font w-40">
+                <!-- 100+ languages will be populated by JS -->
             </select>
-            <button onclick="app.toggleAIPanel()" class="px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded text-purple-400">
+            <button onclick="app.toggleAIPanel()" class="px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded text-purple-400 hover:bg-purple-500/30">
                 <i class="fas fa-robot"></i> AI配置
             </button>
         </div>
     </header>
 
     <div class="flex-1 flex overflow-hidden">
-        <!-- 文件树 -->
-        <aside class="w-56 bg-[#0f0f15] border-r border-[#2a2a3a] flex flex-col">
-            <div class="p-3 border-b border-[#2a2a3a] font-bold text-xs text-gray-400">文件</div>
+        <!-- 左侧文件树 -->
+        <aside class="w-60 bg-[#0f0f15] border-r border-[#2a2a3a] flex flex-col">
+            <div class="p-3 border-b border-[#2a2a3a] flex justify-between items-center">
+                <span class="font-bold text-xs text-gray-400 uppercase">文件资源管理器</span>
+                <button onclick="app.newFile()" class="text-cyan-400 hover:text-cyan-300 text-xs">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
             <div id="fileTree" class="flex-1 overflow-y-auto scroll-hide p-2"></div>
         </aside>
 
-        <!-- 编辑器 -->
+        <!-- 中间编辑区 -->
         <div class="flex-1 flex flex-col min-w-0">
             <div id="tabBar" class="h-9 bg-[#15151e] border-b border-[#2a2a3a] flex overflow-x-auto scroll-hide"></div>
-            <div id="editorContainer" class="flex-1 relative"></div>
             
-            <!-- 底部面板 -->
-            <div class="h-64 bg-[#0f0f15] border-t border-[#2a2a3a] flex flex-col">
-                <div class="flex items-center gap-4 px-4 py-2 border-b border-[#2a2a3a] text-xs bg-[#15151e]">
-                    <button onclick="app.switchPanel('terminal')" class="panel-tab text-cyan-400 font-semibold" data-panel="terminal">
-                        <i class="fas fa-terminal mr-1"></i>终端
-                    </button>
-                    <button onclick="app.switchPanel('discussion')" class="panel-tab text-gray-400 hover:text-gray-300 flex items-center gap-2" data-panel="discussion">
-                        <i class="fas fa-users"></i> 
-                        <span>AI讨论室</span>
-                        <span id="discussionBadge" class="hidden px-1.5 py-0.5 bg-red-500 rounded text-[10px] text-white">新</span>
-                    </button>
+            <!-- 编辑器 + 预览分割 -->
+            <div class="flex-1 flex relative">
+                <div id="editorContainer" class="flex-1 relative"></div>
+                <div id="previewPanel" class="hidden w-1/2 border-l border-[#2a2a3a] bg-white overflow-auto">
+                    <div class="p-2 bg-[#0f0f15] text-xs text-gray-400 flex justify-between items-center">
+                        <span><i class="fas fa-eye mr-1"></i>实时预览</span>
+                        <button onclick="app.togglePreview()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+                    </div>
+                    <iframe id="previewFrame" class="w-full h-[calc(100%-32px)] border-none"></iframe>
+                </div>
+            </div>
+            
+            <!-- 底部AI讨论室 -->
+            <div class="h-80 bg-[#0f0f15] border-t border-[#2a2a3a] flex flex-col">
+                <div class="flex items-center justify-between px-4 py-2 border-b border-[#2a2a3a] bg-[#15151e]">
+                    <div class="flex items-center gap-4">
+                        <span class="font-bold text-cyan-400"><i class="fas fa-comments mr-2"></i>AI协作讨论室</span>
+                        <span id="discussionStatus" class="text-xs text-gray-500">就绪</span>
+                        <span id="turnCounter" class="turn-counter hidden">回合: <span id="currentTurn">0</span>/10</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="app.startRoundTable()" class="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-cyan-500 rounded text-white text-xs font-bold hover:opacity-90">
+                            <i class="fas fa-play mr-1"></i>开始讨论
+                        </button>
+                        <button onclick="app.pauseDiscussion()" id="pauseBtn" class="hidden px-3 py-1.5 bg-orange-500/20 border border-orange-500/50 rounded text-orange-400 text-xs">
+                            <i class="fas fa-pause mr-1"></i>暂停
+                        </button>
+                    </div>
                 </div>
                 
-                <div id="panelContent" class="flex-1 overflow-hidden relative">
-                    <!-- 终端 -->
-                    <div id="terminal" class="panel-section h-full overflow-y-auto scroll-hide p-3 code-font text-xs"></div>
+                <div class="flex-1 flex overflow-hidden">
+                    <!-- 讨论历史 -->
+                    <div id="discussionHistory" class="flex-1 overflow-y-auto scroll-hide p-3 space-y-2"></div>
                     
-                    <!-- AI讨论室 -->
-                    <div id="discussion" class="panel-section hidden h-full flex flex-col">
-                        <!-- 讨论历史 -->
-                        <div id="discussionHistory" class="flex-1 overflow-y-auto scroll-hide p-3 space-y-3"></div>
-                        
-                        <!-- 输入区 -->
-                        <div class="p-3 border-t border-[#2a2a3a] bg-[#15151e]">
-                            <div class="flex gap-2 mb-2">
-                                <input type="text" id="topicInput" placeholder="输入讨论主题（如：优化这段代码的性能、重构建议、Bug排查...）" 
-                                    class="flex-1 bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
-                                    onkeypress="if(event.key==='Enter') app.startDiscussion()">
-                                <button onclick="app.startDiscussion()" class="px-4 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded text-white font-bold text-xs hover:opacity-90">
-                                    <i class="fas fa-comments mr-1"></i>开始讨论
-                                </button>
+                    <!-- 侧边控制 -->
+                    <div class="w-64 border-l border-[#2a2a3a] p-3 flex flex-col gap-3 bg-[#15151e]">
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">讨论主题</label>
+                            <input type="text" id="topicInput" placeholder="如：优化这段代码..." 
+                                class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-2 py-1.5 text-xs focus:border-cyan-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-400 block mb-1">参与AI (已配置)</label>
+                            <div id="participatingAIs" class="space-y-1 text-xs">
+                                <div class="text-gray-500 italic">请先配置API</div>
                             </div>
-                            <div class="flex items-center justify-between text-xs text-gray-500">
-                                <span id="configuredAIs">已配置: 0 个AI</span>
-                                <span>AI可以直接修改代码，变更需你确认</span>
-                            </div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-auto">
+                            <p><i class="fas fa-info-circle mr-1"></i>AI将像真人一样对话讨论，最多10轮</p>
+                            <p class="mt-1">当2+ AI达成一致时会提交修改方案</p>
                         </div>
                     </div>
                 </div>
@@ -141,139 +150,517 @@
         <!-- 右侧面板 -->
         <aside id="aiPanel" class="w-96 bg-[#0f0f15] border-l border-[#2a2a3a] flex flex-col transition-transform duration-300 translate-x-full fixed right-0 top-12 bottom-0 z-40">
             <div class="p-4 border-b border-[#2a2a3a] flex items-center justify-between">
-                <h3 class="font-bold text-purple-400"><i class="fas fa-cog mr-2"></i>API配置</h3>
+                <h3 class="font-bold text-purple-400"><i class="fas fa-cog mr-2"></i>API配置中心</h3>
                 <button onclick="app.toggleAIPanel()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
-            <div class="flex-1 overflow-y-auto scroll-hide p-4 space-y-3" id="apiConfigList"></div>
+            <div class="p-3 bg-orange-500/10 border-b border-orange-500/30 text-xs text-gray-300">
+                <i class="fas fa-exclamation-triangle text-orange-400 mr-1"></i>
+                配置API Key后，AI才能参与讨论。支持OpenAI、Claude、DeepSeek、Kimi等。
+            </div>
+            <div class="flex-1 overflow-y-auto scroll-hide p-3 space-y-2" id="apiConfigList"></div>
         </aside>
     </div>
 
-    <!-- API配置弹窗 -->
+    <!-- 配置弹窗 -->
     <div id="apiModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
         <div class="bg-[#15151e] border border-[#2a2a3a] rounded-lg p-6 w-[450px]">
             <h3 class="text-lg font-bold mb-4 text-cyan-400" id="modalTitle">配置API</h3>
-            <input type="password" id="apiKeyInput" placeholder="输入API Key..." class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 mb-3 text-sm focus:border-cyan-500 outline-none">
-            <input type="text" id="apiUrlInput" placeholder="Base URL (可选)" class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 mb-4 text-sm focus:border-cyan-500 outline-none text-gray-400">
+            <input type="password" id="apiKeyInput" placeholder="sk-..." class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 mb-3 text-sm focus:border-cyan-500 outline-none code-font">
+            <input type="text" id="apiUrlInput" placeholder="Base URL (可选)" class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 mb-4 text-sm focus:border-cyan-500 outline-none text-gray-400 text-xs">
             <div class="flex gap-3">
                 <button onclick="app.closeApiModal()" class="flex-1 py-2 border border-[#2a2a3a] rounded hover:bg-white/5">取消</button>
-                <button onclick="app.saveApiConfig()" class="flex-1 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 hover:bg-cyan-500/30">保存</button>
+                <button onclick="app.saveApiConfig()" class="flex-1 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 hover:bg-cyan-500/30 font-semibold">保存</button>
             </div>
         </div>
     </div>
 
-    <!-- 代码变更确认弹窗 -->
-    <div id="diffModal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-center justify-center">
-        <div class="bg-[#15151e] border border-[#2a2a3a] rounded-lg w-[800px] h-[600px] flex flex-col">
-            <div class="p-4 border-b border-[#2a2a3a] flex items-center justify-between">
+    <!-- 共识方案弹窗 -->
+    <div id="consensusModal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-center justify-center">
+        <div class="bg-[#15151e] border border-green-500/50 rounded-lg w-[800px] h-[600px] flex flex-col shadow-[0_0_50px_rgba(0,255,157,0.2)]">
+            <div class="p-4 border-b border-green-500/30 bg-green-500/10 flex items-center justify-between">
                 <div>
-                    <h3 class="font-bold text-lg text-cyan-400">AI建议的代码变更</h3>
-                    <p class="text-xs text-gray-400 mt-1">来自: <span id="diffAuthor" class="text-purple-400"></span></p>
+                    <h3 class="font-bold text-xl text-green-400"><i class="fas fa-check-circle mr-2"></i>AI共识方案</h3>
+                    <p class="text-xs text-gray-400 mt-1">以下AI达成一致： <span id="consensusAIs" class="text-green-400"></span></p>
                 </div>
-                <button onclick="app.closeDiffModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+                <button onclick="app.closeConsensusModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
             </div>
-            <div class="flex-1 overflow-auto p-4 code-font text-xs" id="diffContent"></div>
-            <div class="p-4 border-t border-[#2a2a3a] flex justify-end gap-3">
-                <button onclick="app.rejectChange()" class="px-6 py-2 btn-reject rounded font-bold"><i class="fas fa-times mr-2"></i>拒绝</button>
-                <button onclick="app.acceptChange()" class="px-6 py-2 btn-accept rounded font-bold"><i class="fas fa-check mr-2"></i>应用变更</button>
+            <div class="flex-1 overflow-auto p-4 code-font text-xs" id="consensusContent"></div>
+            <div class="p-4 border-t border-green-500/30 bg-[#0f0f15] flex justify-between items-center">
+                <span class="text-xs text-gray-400">此方案已获得多个AI认可，建议采纳</span>
+                <div class="flex gap-3">
+                    <button onclick="app.rejectConsensus()" class="px-6 py-2 bg-red-500/20 border border-red-500/50 rounded text-red-400 hover:bg-red-500/30 font-bold">拒绝</button>
+                    <button onclick="app.acceptConsensus()" class="px-6 py-2 bg-green-500/20 border border-green-500/50 rounded text-green-400 hover:bg-green-500/30 font-bold">应用方案</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        const app = {
-            editor: null,
-            currentFile: null,
-            files: new Map(),
-            currentEditingProvider: null,
-            pendingChange: null, // 待确认的代码变更
+        // 100+种编程语言定义
+        const LANGUAGES = {
+            // 主流语言
+            javascript: 'JavaScript', typescript: 'TypeScript', python: 'Python',
+            java: 'Java', cpp: 'C++', c: 'C', csharp: 'C#', go: 'Go',
+            rust: 'Rust', php: 'PHP', swift: 'Swift', kotlin: 'Kotlin',
+            ruby: 'Ruby', perl: 'Perl', lua: 'Lua', dart: 'Dart',
+            r: 'R', scala: 'Scala', haskell: 'Haskell', clojure: 'Clojure',
+            erlang: 'Erlang', elixir: 'Elixir', fsharp: 'F#',
+            'objective-c': 'Objective-C', vb: 'Visual Basic',
             
-            apiConfigs: {
-                openai: { name: 'OpenAI GPT-4', key: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4', color: 'green' },
-                claude: { name: 'Claude 3.5', key: '', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20241022', color: 'orange' },
-                deepseek: { name: 'DeepSeek', key: '', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', color: 'blue' },
-                moonshot: { name: 'Kimi', key: '', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', color: 'purple' },
-                zhipu: { name: '智谱GLM-4', key: '', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4', color: 'cyan' },
-                alibaba: { name: '通义千问', key: '', baseUrl: 'https://dashscope.aliyuncs.com/api/v1', model: 'qwen-turbo', color: 'orange' }
-            },
+            // 系统/底层
+            assembly: 'Assembly', cobol: 'COBOL', fortran: 'Fortran',
+            ada: 'Ada', d: 'D', nim: 'Nim', crystal: 'Crystal',
+            zig: 'Zig', odin: 'Odin', jai: 'Jai',
+            
+            // 脚本/工具
+            shell: 'Bash', powershell: 'PowerShell', bat: 'Batch',
+            vbscript: 'VBScript', awk: 'AWK', sed: 'SED',
+            
+            // 函数式/学术
+            lisp: 'Lisp', scheme: 'Scheme', racket: 'Racket',
+            prolog: 'Prolog', mercury: 'Mercury', idris: 'Idris',
+            agda: 'Agda', coq: 'Coq', lean: 'Lean',
+            ocaml: 'OCaml', reason: 'ReasonML', elm: 'Elm',
+            purescript: 'PureScript', wolfram: 'Wolfram',
+            
+            // 数据/科学
+            matlab: 'MATLAB', octave: 'Octave', scilab: 'Scilab',
+            julia: 'Julia', maple: 'Maple', 'racket': 'Racket',
+            
+            // 标记/配置
+            html: 'HTML', css: 'CSS', scss: 'SCSS', less: 'LESS',
+            json: 'JSON', yaml: 'YAML', toml: 'TOML', xml: 'XML',
+            markdown: 'Markdown', sql: 'SQL',
+            
+            // 历史/特殊
+            pascal: 'Pascal', delphi: 'Delphi', smalltalk: 'Smalltalk',
+            eiffel: 'Eiffel', simula: 'Simula', algol: 'ALGOL',
+            apl: 'APL', forth: 'Forth', tcl: 'Tcl', rexx: 'REXX',
+            
+            // 游戏/创意
+            'c-sharp': 'C# (Unity)', gdscript: 'GDScript', lua: 'Lua (Game)',
+            processing: 'Processing', p5js: 'p5.js', threejs: 'Three.js',
+            
+            // 移动开发
+            dart: 'Dart (Flutter)', swift: 'Swift (iOS)', kotlin: 'Kotlin (Android)',
+            'react-native': 'React Native', flutter: 'Flutter',
+            
+            // Web前端
+            vue: 'Vue', react: 'React', svelte: 'Svelte', angular: 'Angular',
+            solid: 'SolidJS', qwik: 'Qwik', astro: 'Astro',
+            
+            // 后端框架
+            express: 'Express', django: 'Django', flask: 'Flask',
+            spring: 'Spring', rails: 'Ruby on Rails', laravel: 'Laravel',
+            
+            // 数据库
+            postgresql: 'PostgreSQL', mysql: 'MySQL', mongodb: 'MongoDB',
+            redis: 'Redis', sqlite: 'SQLite', graphql: 'GraphQL',
+            
+            // 区块链
+            solidity: 'Solidity', rust: 'Rust (Solana)', move: 'Move',
+            
+            // 其他
+            webassembly: 'WebAssembly', wat: 'WAT', v: 'V', pony: 'Pony',
+            crystal: 'Crystal', nim: 'Nim', red: 'Red', haxe: 'Haxe'
+        };
 
+        const AppState = {
+            files: new Map(),
+            currentFile: null,
+            editor: null,
+            apiConfigs: {},
+            currentEditingProvider: null,
+            discussionActive: false,
+            discussionTurn: 0,
+            maxTurns: 10,
+            discussionHistory: [], // {role: 'ai'|'user', content: '', aiId: '', aiName: ''}
+            participatingAIs: [],
+            consensusProposal: null,
+            isModified: false,
+            previewVisible: false
+        };
+
+        const app = {
             init() {
-                this.loadConfigs();
+                this.initLanguages();
+                this.initApiConfigs();
+                this.loadData();
                 this.initEditor();
                 this.initFiles();
                 this.renderApiList();
-                this.updateConfiguredCount();
-                this.log('系统就绪。配置API后，在下方讨论室输入主题开始AI协作。', 'success');
+                this.updateParticipatingAIs();
+                
+                // 自动保存
+                setInterval(() => {
+                    if (AppState.isModified) this.saveFile(true);
+                }, 30000);
+                
+                this.log('系统就绪。支持100+种语言。配置API后开启AI讨论。', 'success');
             },
 
-            loadConfigs() {
+            initLanguages() {
+                const select = document.getElementById('languageSelect');
+                Object.entries(LANGUAGES).forEach(([value, label]) => {
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    select.appendChild(opt);
+                });
+            },
+
+            initApiConfigs() {
+                AppState.apiConfigs = {
+                    openai: { name: 'OpenAI GPT-4', key: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4', color: 'green', avatar: 'O' },
+                    claude: { name: 'Claude 3.5', key: '', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20241022', color: 'orange', avatar: 'C' },
+                    deepseek: { name: 'DeepSeek', key: '', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', color: 'blue', avatar: 'D' },
+                    moonshot: { name: 'Kimi', key: '', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', color: 'purple', avatar: 'K' },
+                    zhipu: { name: '智谱GLM-4', key: '', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4', color: 'cyan', avatar: 'Z' },
+                    alibaba: { name: '通义千问', key: '', baseUrl: 'https://dashscope.aliyuncs.com/api/v1', model: 'qwen-turbo', color: 'orange', avatar: 'A' },
+                    baidu: { name: '文心一言', key: '', baseUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop', model: 'ernie-bot-4', color: 'blue', avatar: 'B' },
+                    xunfei: { name: '讯飞星火', key: '', baseUrl: 'wss://spark-api.xf-yun.com/v3.5/chat', model: 'generalv3.5', color: 'purple', avatar: 'X' }
+                };
+            },
+
+            loadData() {
                 try {
-                    const saved = localStorage.getItem('ide_api_configs');
-                    if (saved) {
-                        const parsed = JSON.parse(saved);
+                    const savedApis = localStorage.getItem('ultimate_ide_apis');
+                    if (savedApis) {
+                        const parsed = JSON.parse(savedApis);
                         Object.keys(parsed).forEach(k => {
-                            if (this.apiConfigs[k]) {
-                                this.apiConfigs[k].key = parsed[k].key || '';
-                                if (parsed[k].baseUrl) this.apiConfigs[k].baseUrl = parsed[k].baseUrl;
+                            if (AppState.apiConfigs[k]) {
+                                AppState.apiConfigs[k].key = parsed[k].key || '';
+                                if (parsed[k].baseUrl) AppState.apiConfigs[k].baseUrl = parsed[k].baseUrl;
                             }
                         });
+                    }
+
+                    const savedFiles = localStorage.getItem('ultimate_ide_files');
+                    if (savedFiles) {
+                        const files = JSON.parse(savedFiles);
+                        AppState.files = new Map(Object.entries(files));
                     }
                 } catch(e) { console.error(e); }
             },
 
-            saveConfigs() {
-                localStorage.setItem('ide_api_configs', JSON.stringify(this.apiConfigs));
+            saveData() {
+                try {
+                    localStorage.setItem('ultimate_ide_apis', JSON.stringify(AppState.apiConfigs));
+                    const filesObj = Object.fromEntries(AppState.files);
+                    localStorage.setItem('ultimate_ide_files', JSON.stringify(filesObj));
+                } catch(e) { console.error(e); }
             },
 
             initEditor() {
                 require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
                 require(['vs/editor/editor.main'], () => {
-                    this.editor = monaco.editor.create(document.getElementById('editorContainer'), {
-                        value: '// 示例代码：斐波那契数列\nfunction fibonacci(n) {\n    if (n <= 1) return n;\n    return fibonacci(n - 1) + fibonacci(n - 2);\n}\n\n// 测试\nfor (let i = 0; i < 10; i++) {\n    console.log(fibonacci(i));\n}',
-                        language: 'javascript',
+                    AppState.editor = monaco.editor.create(document.getElementById('editorContainer'), {
+                        value: '<!-- 示例：HTML页面 -->\n<!DOCTYPE html>\n<html>\n<head>\n    <title>My Page</title>\n    <style>\n        body { font-family: Arial; background: #f0f0f0; }\n        h1 { color: #333; }\n    </style>\n</head>\n<body>\n    <h1>Hello World</h1>\n    <button onclick="alert(\\'Clicked!\\')">Click me</button>\n    <script>\n        console.log("Page loaded");\n    <\\/script>\n</body>\n</html>',
+                        language: 'html',
                         theme: 'vs-dark',
                         fontSize: 14,
                         fontFamily: 'JetBrains Mono',
                         minimap: { enabled: true },
                         automaticLayout: true
                     });
+
+                    AppState.editor.onDidChangeModelContent(() => {
+                        this.markModified();
+                        if (AppState.previewVisible) this.updatePreview();
+                    });
+
+                    AppState.editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => this.saveFile());
                 });
             },
 
             initFiles() {
-                this.files.set('main.js', { name: 'main.js', language: 'javascript', content: this.editor ? this.editor.getValue() : '' });
-                this.currentFile = 'main.js';
+                if (AppState.files.size === 0) {
+                    AppState.files.set('index.html', {
+                        name: 'index.html',
+                        language: 'html',
+                        content: '<!-- 示例：HTML页面 -->\n<!DOCTYPE html>\n<html>\n<head>\n    <title>My Page</title>\n    <style>\n        body { font-family: Arial; background: #f0f0f0; }\n        h1 { color: #333; }\n    </style>\n</head>\n<body>\n    <h1>Hello World</h1>\n    <button onclick="alert(\\'Clicked!\\')">Click me</button>\n    <script>\n        console.log("Page loaded");\n    <\\/script>\n</body>\n</html>'
+                    });
+                }
+
+                const firstFile = AppState.files.keys().next().value;
+                AppState.currentFile = firstFile;
+                this.renderFileTree();
+                this.renderTabs();
+                this.updateEditor();
+            },
+
+            // 文件操作
+            newFile() {
+                const name = prompt('文件名 (如: script.js, style.css, page.html):', 'newfile.js');
+                if (!name) return;
+                
+                if (AppState.files.has(name)) {
+                    alert('文件已存在！');
+                    return;
+                }
+
+                const ext = name.split('.').pop().toLowerCase();
+                const langMap = {
+                    'js': 'javascript', 'ts': 'typescript', 'py': 'python',
+                    'java': 'java', 'cpp': 'cpp', 'c': 'c', 'cs': 'csharp',
+                    'go': 'go', 'rs': 'rust', 'php': 'php', 'rb': 'ruby',
+                    'swift': 'swift', 'kt': 'kotlin', 'html': 'html',
+                    'css': 'css', 'scss': 'scss', 'json': 'json', 'md': 'markdown',
+                    'sql': 'sql', 'sh': 'shell', 'ps1': 'powershell',
+                    'vue': 'vue', 'jsx': 'javascript', 'tsx': 'typescript'
+                };
+                
+                const language = langMap[ext] || 'plaintext';
+                
+                AppState.files.set(name, {
+                    name: name,
+                    language: language,
+                    content: '',
+                    created: Date.now()
+                });
+                
+                this.saveData();
+                this.openFile(name);
+                this.log(`创建文件: ${name}`, 'success');
+            },
+
+            openFile(name) {
+                // 保存当前
+                if (AppState.isModified && AppState.currentFile) {
+                    this.saveFile(true);
+                }
+
+                const file = AppState.files.get(name);
+                if (!file) return;
+
+                AppState.currentFile = name;
+                this.updateEditor();
+                this.renderFileTree();
+                this.renderTabs();
+                this.markSaved();
+                
+                if (AppState.previewVisible) this.updatePreview();
+            },
+
+            closeFile(e, name) {
+                e.stopPropagation();
+                
+                if (name === AppState.currentFile && AppState.isModified) {
+                    this.saveFile();
+                }
+                
+                AppState.files.delete(name);
+                
+                if (AppState.currentFile === name) {
+                    const next = AppState.files.keys().next().value;
+                    if (next) {
+                        this.openFile(next);
+                    } else {
+                        AppState.currentFile = null;
+                        AppState.editor.setValue('');
+                    }
+                }
+                
+                this.saveData();
                 this.renderFileTree();
                 this.renderTabs();
             },
 
-            renderApiList() {
-                const container = document.getElementById('apiConfigList');
-                if (!container) return;
+            saveFile(auto = false) {
+                if (!AppState.currentFile || !AppState.editor) return;
+                
+                const content = AppState.editor.getValue();
+                const file = AppState.files.get(AppState.currentFile);
+                
+                if (file) {
+                    file.content = content;
+                    file.lastModified = Date.now();
+                    this.saveData();
+                    this.markSaved();
+                    
+                    const msg = auto ? '自动保存' : `已保存: ${AppState.currentFile}`;
+                    this.log(msg, 'success');
+                    
+                    if (!auto) this.showToast('保存成功');
+                }
+            },
+
+            markModified() {
+                AppState.isModified = true;
+                document.getElementById('saveDot').classList.remove('hidden');
+                this.renderTabs();
+            },
+
+            markSaved() {
+                AppState.isModified = false;
+                document.getElementById('saveDot').classList.add('hidden');
+                this.renderTabs();
+            },
+
+            updateEditor() {
+                const file = AppState.files.get(AppState.currentFile);
+                if (file && AppState.editor) {
+                    AppState.editor.setValue(file.content);
+                    monaco.editor.setModelLanguage(AppState.editor.getModel(), file.language);
+                    document.getElementById('languageSelect').value = file.language;
+                }
+            },
+
+            changeLanguage(lang) {
+                if (AppState.editor) {
+                    monaco.editor.setModelLanguage(AppState.editor.getModel(), lang);
+                    const file = AppState.files.get(AppState.currentFile);
+                    if (file) file.language = lang;
+                }
+            },
+
+            // 渲染
+            renderFileTree() {
+                const container = document.getElementById('fileTree');
                 container.innerHTML = '';
                 
-                Object.entries(this.apiConfigs).forEach(([key, cfg]) => {
-                    const isCfg = cfg.key && cfg.key.length > 0;
+                AppState.files.forEach((file, name) => {
+                    const isActive = name === AppState.currentFile;
+                    const isModified = isActive && AppState.isModified;
+                    
                     const div = document.createElement('div');
-                    div.className = `config-card p-3 rounded-lg border ${isCfg ? 'border-green-500/30 bg-green-500/5' : 'border-[#2a2a3a] bg-[#1a1a23]'} flex justify-between items-center`;
+                    div.className = `flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-white/5 mx-1 rounded ${isActive ? 'file-active' : ''}`;
+                    div.onclick = () => this.openFile(name);
+                    
+                    const icon = this.getFileIcon(file.language);
+                    
                     div.innerHTML = `
-                        <div class="flex items-center gap-2">
-                            <div class="w-2 h-2 rounded-full ${isCfg ? 'bg-green-400' : 'bg-red-400'}"></div>
-                            <div>
-                                <div class="text-sm font-medium ${isCfg ? 'text-green-400' : 'text-gray-400'}">${cfg.name}</div>
-                                <div class="text-[10px] text-gray-500">${isCfg ? '已配置' : '未配置'}</div>
-                            </div>
-                        </div>
-                        <button onclick="app.openApiModal('${key}')" class="px-3 py-1 rounded text-xs ${isCfg ? 'bg-green-500/20 text-green-400' : 'bg-cyan-500/20 text-cyan-400'} border border-current opacity-80 hover:opacity-100">
-                            ${isCfg ? '修改' : '配置'}
-                        </button>
+                        <i class="${icon} ${isActive ? 'text-cyan-400' : 'text-gray-500'} text-xs w-4"></i>
+                        <span class="text-xs ${isActive ? 'text-white' : 'text-gray-300'} flex-1 truncate">${name}</span>
+                        ${isModified ? '<span class="w-2 h-2 bg-orange-400 rounded-full"></span>' : ''}
                     `;
                     container.appendChild(div);
                 });
             },
 
+            renderTabs() {
+                const container = document.getElementById('tabBar');
+                container.innerHTML = '';
+                
+                AppState.files.forEach((file, name) => {
+                    const isActive = name === AppState.currentFile;
+                    const isModified = isActive && AppState.isModified;
+                    
+                    const div = document.createElement('div');
+                    div.className = `flex items-center gap-2 px-4 py-2 border-r border-[#2a2a3a] cursor-pointer min-w-[120px] max-w-[200px] group ${isActive ? 'tab-active' : 'text-gray-400 hover:bg-[#1f1f2a]'}`;
+                    div.onclick = () => this.openFile(name);
+                    
+                    div.innerHTML = `
+                        <span class="text-xs truncate flex-1">${name}${isModified ? ' ●' : ''}</span>
+                        <i class="fas fa-times text-xs opacity-0 group-hover:opacity-100 hover:text-red-400 ml-1" onclick="app.closeFile(event, '${name}')"></i>
+                    `;
+                    container.appendChild(div);
+                });
+            },
+
+            getFileIcon(lang) {
+                const map = {
+                    'html': 'fab fa-html5', 'css': 'fab fa-css3', 'javascript': 'fab fa-js',
+                    'typescript': 'fas fa-code', 'python': 'fab fa-python', 'java': 'fab fa-java',
+                    'php': 'fab fa-php', 'ruby': 'fas fa-gem', 'go': 'fas fa-code',
+                    'rust': 'fas fa-cog', 'swift': 'fab fa-swift', 'kotlin': 'fas fa-code',
+                    'shell': 'fas fa-terminal', 'sql': 'fas fa-database', 'json': 'fas fa-file-code'
+                };
+                return map[lang] || 'fas fa-file-code';
+            },
+
+            // 预览功能
+            togglePreview() {
+                const panel = document.getElementById('previewPanel');
+                AppState.previewVisible = !AppState.previewVisible;
+                
+                if (AppState.previewVisible) {
+                    panel.classList.remove('hidden');
+                    this.updatePreview();
+                } else {
+                    panel.classList.add('hidden');
+                }
+                
+                // 重新布局编辑器
+                if (AppState.editor) {
+                    setTimeout(() => AppState.editor.layout(), 100);
+                }
+            },
+
+            updatePreview() {
+                const frame = document.getElementById('previewFrame');
+                const file = AppState.files.get(AppState.currentFile);
+                
+                if (!file || !AppState.previewVisible) return;
+                
+                const content = AppState.editor.getValue();
+                
+                // 根据文件类型处理
+                if (file.language === 'html' || file.name.endsWith('.html')) {
+                    frame.srcdoc = content;
+                } else if (file.language === 'markdown' || file.name.endsWith('.md')) {
+                    // 简单的markdown转html
+                    const html = this.markdownToHtml(content);
+                    frame.srcdoc = html;
+                } else if (file.language === 'javascript' || file.name.endsWith('.js')) {
+                    // 创建一个html包装来运行js
+                    frame.srcdoc = `
+                        <!DOCTYPE html>
+                        <html><head><title>JS Preview</title></head><body>
+                        <pre style="font-family: monospace; padding: 20px;">${content.replace(/</g, '&lt;')}</pre>
+                        <script>${content}<\/script>
+                        </body></html>
+                    `;
+                } else {
+                    frame.srcdoc = `<pre style="font-family: monospace; padding: 20px; white-space: pre-wrap;">${content.replace(/</g, '&lt;')}</pre>`;
+                }
+            },
+
+            markdownToHtml(md) {
+                return md
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/\*\*(.*)\*\*/gim, '<b>$1</b>')
+                    .replace(/\*(.*)\*/gim, '<i>$1</i>')
+                    .replace(/`([^`]+)`/gim, '<code style="background:#f0f0f0;padding:2px 4px;border-radius:3px;">$1</code>')
+                    .replace(/\n/gim, '<br>');
+            },
+
+            // API配置
+            renderApiList() {
+                const container = document.getElementById('apiConfigList');
+                container.innerHTML = '';
+                
+                Object.entries(AppState.apiConfigs).forEach(([key, cfg]) => {
+                    const isConfigured = cfg.key && cfg.key.length > 0;
+                    const div = document.createElement('div');
+                    div.className = `p-3 rounded-lg border ${isConfigured ? 'border-green-500/30 bg-green-500/5' : 'border-[#2a2a3a] bg-[#1a1a23]'} flex justify-between items-center hover:border-cyan-500/50 transition-colors cursor-pointer`;
+                    div.onclick = (e) => {
+                        if (!e.target.closest('button')) this.openApiModal(key);
+                    };
+                    
+                    div.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded bg-${cfg.color}-500/20 text-${cfg.color}-400 flex items-center justify-center font-bold text-xs">${cfg.avatar}</div>
+                            <div>
+                                <div class="text-sm font-medium ${isConfigured ? 'text-green-400' : 'text-gray-400'}">${cfg.name}</div>
+                                <div class="text-[10px] text-gray-500">${isConfigured ? '✓ 已配置' : '点击配置'}</div>
+                            </div>
+                        </div>
+                        <button onclick="app.openApiModal('${key}')" class="px-3 py-1 rounded text-xs ${isConfigured ? 'bg-green-500/20 text-green-400' : 'bg-cyan-500/20 text-cyan-400'} border border-current opacity-80 hover:opacity-100">
+                            ${isConfigured ? '修改' : '配置'}
+                        </button>
+                    `;
+                    container.appendChild(div);
+                });
+                
+                this.updateParticipatingAIs();
+            },
+
             openApiModal(key) {
-                this.currentEditingProvider = key;
-                const cfg = this.apiConfigs[key];
+                AppState.currentEditingProvider = key;
+                const cfg = AppState.apiConfigs[key];
                 document.getElementById('modalTitle').textContent = `配置 ${cfg.name}`;
                 document.getElementById('apiKeyInput').value = cfg.key || '';
                 document.getElementById('apiUrlInput').value = cfg.baseUrl || '';
@@ -282,127 +669,292 @@
 
             closeApiModal() {
                 document.getElementById('apiModal').classList.add('hidden');
-                this.currentEditingProvider = null;
+                AppState.currentEditingProvider = null;
             },
 
             saveApiConfig() {
-                if (!this.currentEditingProvider) return;
+                if (!AppState.currentEditingProvider) return;
+                
                 const key = document.getElementById('apiKeyInput').value.trim();
                 const url = document.getElementById('apiUrlInput').value.trim();
                 
-                this.apiConfigs[this.currentEditingProvider].key = key;
-                if (url) this.apiConfigs[this.currentEditingProvider].baseUrl = url;
+                AppState.apiConfigs[AppState.currentEditingProvider].key = key;
+                if (url) AppState.apiConfigs[AppState.currentEditingProvider].baseUrl = url;
                 
-                this.saveConfigs();
+                this.saveData();
                 this.renderApiList();
-                this.updateConfiguredCount();
                 this.closeApiModal();
-                this.log(`已保存 ${this.apiConfigs[this.currentEditingProvider].name} 配置`, 'success');
+                this.log(`已配置: ${AppState.apiConfigs[AppState.currentEditingProvider].name}`, 'success');
             },
 
-            updateConfiguredCount() {
-                const count = Object.values(this.apiConfigs).filter(c => c.key && c.key.length > 0).length;
-                const el = document.getElementById('configuredAIs');
-                if (el) el.textContent = `已配置: ${count} 个AI`;
-            },
-
-            getConfiguredAIs() {
-                return Object.entries(this.apiConfigs)
-                    .filter(([_, c]) => c.key && c.key.length > 0)
-                    .map(([k, c]) => ({ id: k, ...c }));
-            },
-
-            // 核心：开始讨论
-            async startDiscussion() {
-                const topicInput = document.getElementById('topicInput');
-                const topic = topicInput.value.trim();
+            updateParticipatingAIs() {
+                const container = document.getElementById('participatingAIs');
+                const configured = Object.entries(AppState.apiConfigs)
+                    .filter(([_, c]) => c.key && c.key.length > 0);
                 
+                if (configured.length === 0) {
+                    container.innerHTML = '<div class="text-gray-500 italic">请先配置API Key</div>';
+                    AppState.participatingAIs = [];
+                    return;
+                }
+                
+                AppState.participatingAIs = configured.map(([k, c]) => ({ id: k, ...c }));
+                
+                container.innerHTML = configured.map(([k, c]) => `
+                    <div class="flex items-center gap-2 p-2 rounded bg-${c.color}-500/10 border border-${c.color}-500/30">
+                        <div class="w-5 h-5 rounded bg-${c.color}-500/20 text-${c.color}-400 flex items-center justify-center text-xs font-bold">${c.avatar}</div>
+                        <span class="text-${c.color}-400 text-xs">${c.name}</span>
+                    </div>
+                `).join('');
+            },
+
+            toggleAIPanel() {
+                document.getElementById('aiPanel').classList.toggle('translate-x-full');
+            },
+
+            // AI讨论核心
+            async startRoundTable() {
+                const topic = document.getElementById('topicInput').value.trim();
                 if (!topic) {
                     alert('请输入讨论主题');
                     return;
                 }
 
-                const configured = this.getConfiguredAIs();
-                if (configured.length === 0) {
-                    this.addDiscussionMessage('system', '⚠️ 错误', '请先配置至少一个AI的API Key。点击右上角的"AI配置"按钮。');
-                    this.switchPanel('discussion');
+                if (AppState.participatingAIs.length < 2) {
+                    alert('需要至少2个配置的AI才能开始讨论');
+                    this.toggleAIPanel();
                     return;
                 }
 
-                const code = this.editor.getValue();
+                // 重置讨论状态
+                AppState.discussionActive = true;
+                AppState.discussionTurn = 0;
+                AppState.discussionHistory = [];
+                AppState.consensusProposal = null;
+                
+                document.getElementById('discussionHistory').innerHTML = '';
+                document.getElementById('turnCounter').classList.remove('hidden');
+                document.getElementById('pauseBtn').classList.remove('hidden');
+                document.getElementById('discussionStatus').textContent = '讨论进行中...';
+                
+                const code = AppState.editor.getValue();
                 const language = document.getElementById('languageSelect').value;
                 
-                this.switchPanel('discussion');
-                topicInput.value = '';
+                // 系统开场
+                this.addDiscussionMessage('system', '🎯 讨论开始', `主题: ${topic}\n参与AI: ${AppState.participatingAIs.map(a => a.name).join(', ')}\n\n当前代码 (${language}):\n\`\`\`\n${code.substring(0, 200)}${code.length > 200 ? '...' : ''}\n\`\`\``);
                 
-                // 系统消息
-                this.addDiscussionMessage('system', '🚀 开始多AI协作讨论', 
-                    `<div class="text-cyan-400 font-bold mb-1">主题: ${topic}</div>
-                     <div class="text-xs text-gray-400">参与AI: ${configured.map(a => `<span class="text-${a.color}-400">${a.name}</span>`).join(', ')}</div>
-                     <div class="text-xs text-gray-500 mt-1">当前代码长度: ${code.length} 字符</div>`
-                );
-
-                // 并行调用所有AI
-                const messages = [
-                    { role: 'system', content: `你是专业程序员。针对用户的代码和话题，请：
-1. 先分析代码现状
-2. 给出具体建议
-3. 如果建议涉及代码修改，必须输出完整的修改后代码块，用 \`\`\`${language} 包裹
-4. 保持简洁，中文回答` },
-                    { role: 'user', content: `讨论主题: ${topic}\n\n当前代码:\n\`\`\`${language}\n${code}\n\`\`\`` }
-                ];
-
-                configured.forEach((ai, idx) => {
-                    setTimeout(() => {
-                        this.callAIForDiscussion(ai, messages, topic);
-                    }, idx * 800);
-                });
+                // 开始轮流发言
+                this.runDiscussionRound(topic, code, language);
             },
 
-            async callAIForDiscussion(ai, messages, topic) {
-                // 显示输入中
-                const typingId = `typing-${ai.id}-${Date.now()}`;
+            async runDiscussionRound(topic, code, language) {
+                if (!AppState.discussionActive || AppState.discussionTurn >= AppState.maxTurns) {
+                    this.endDiscussion();
+                    return;
+                }
+
+                AppState.discussionTurn++;
+                document.getElementById('currentTurn').textContent = AppState.discussionTurn;
+                
+                // 每个AI轮流发言
+                for (let i = 0; i < AppState.participatingAIs.length; i++) {
+                    if (!AppState.discussionActive) return;
+                    
+                    const ai = AppState.participatingAIs[i];
+                    await this.aiSpeak(ai, topic, code, language, AppState.discussionTurn, i);
+                    
+                    // 检查是否达成共识
+                    if (this.checkConsensus()) {
+                        this.proposeConsensus();
+                        return;
+                    }
+                    
+                    // AI之间的小延迟，模拟思考
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+
+                // 下一轮
+                if (AppState.discussionActive) {
+                    setTimeout(() => this.runDiscussionRound(topic, code, language), 500);
+                }
+            },
+
+            async aiSpeak(ai, topic, code, language, turn, index) {
+                const typingId = `typing-${ai.id}-${turn}-${index}`;
                 this.addTypingIndicator(typingId, ai);
+                
+                // 构建上下文 - 包含之前的对话
+                const context = AppState.discussionHistory.slice(-6).map(h => 
+                    `${h.role === 'ai' ? h.aiName : 'User'}: ${h.content.substring(0, 200)}`
+                ).join('\n\n');
+                
+                const prompt = `这是第${turn}轮讨论，你是${ai.name}。
+
+主题: ${topic}
+当前代码 (${language}):
+\`\`\`
+${code}
+\`\`\`
+
+之前的讨论:
+${context}
+
+要求：
+1. 直接回应之前的观点，像真人对话一样
+2. 可以同意、反对或补充其他AI的观点
+3. 如果认为代码需要修改，明确提出修改方案
+4. 保持简洁，100字以内，中文回答
+5. 不要重复之前说过的内容`;
 
                 try {
-                    const content = await this.callAI(ai.id, messages);
+                    const response = await this.callAI(ai.id, [
+                        { role: 'system', content: '你是专业程序员，参与技术讨论。直接、简洁、有观点。' },
+                        { role: 'user', content: prompt }
+                    ]);
+                    
                     this.removeTypingIndicator(typingId);
                     
-                    // 解析AI回复，检查是否包含代码
-                    const codeBlockMatch = content.match(/```[\w]*\n([\s\S]*?)```/);
-                    const hasCode = codeBlockMatch && codeBlockMatch[1];
+                    // 记录到历史
+                    AppState.discussionHistory.push({
+                        role: 'ai',
+                        content: response,
+                        aiId: ai.id,
+                        aiName: ai.name,
+                        turn: turn,
+                        timestamp: Date.now()
+                    });
                     
-                    // 提取文字部分（去掉代码块）
-                    let textContent = content.replace(/```[\w]*\n[\s\S]*?```/g, '[代码建议见下方]').trim();
+                    this.addDiscussionMessage(ai.id, ai.name, response, ai.color, turn);
                     
-                    // 添加AI消息
-                    this.addDiscussionMessage(ai.id, ai.name, textContent, ai.color);
-                    
-                    // 如果有代码建议，添加操作卡片
-                    if (hasCode) {
-                        const suggestedCode = codeBlockMatch[1].trim();
-                        const currentCode = this.editor.getValue();
-                        
-                        // 检查是否真的不同
-                        if (suggestedCode !== currentCode) {
-                            setTimeout(() => {
-                                this.addActionCard(ai, suggestedCode, textContent || '代码优化建议');
-                            }, 500);
+                    // 检查是否包含代码修改建议
+                    const codeMatch = response.match(/```[\w]*\n([\s\S]*?)```/);
+                    if (codeMatch) {
+                        const proposedCode = codeMatch[1].trim();
+                        if (proposedCode !== code && proposedCode.length > 10) {
+                            // 记录提案
+                            if (!AppState.consensusProposal) {
+                                AppState.consensusProposal = {
+                                    code: proposedCode,
+                                    proposers: [ai.name],
+                                    votes: 1
+                                };
+                            } else if (AppState.consensusProposal.code === proposedCode) {
+                                AppState.consensusProposal.proposers.push(ai.name);
+                                AppState.consensusProposal.votes++;
+                            }
                         }
                     }
                     
                 } catch (err) {
                     this.removeTypingIndicator(typingId);
-                    this.addDiscussionMessage('error', ai.name, `<span class="text-red-400">错误: ${err.message}</span>`);
+                    this.addDiscussionMessage('error', ai.name, `错误: ${err.message}`, 'red', turn);
                 }
             },
 
+            checkConsensus() {
+                // 检查是否有2+ AI提出相同的修改方案
+                return AppState.consensusProposal && AppState.consensusProposal.votes >= 2;
+            },
+
+            proposeConsensus() {
+                AppState.discussionActive = false;
+                document.getElementById('discussionStatus').textContent = '已达成共识';
+                document.getElementById('pauseBtn').classList.add('hidden');
+                
+                const proposal = AppState.consensusProposal;
+                
+                // 显示共识弹窗
+                document.getElementById('consensusAIs').textContent = proposal.proposers.join(', ');
+                
+                const currentCode = AppState.editor.getValue();
+                document.getElementById('consensusContent').innerHTML = `
+                    <div class="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded">
+                        <div class="text-green-400 font-bold mb-2">✓ ${proposal.votes} 个AI一致推荐此方案</div>
+                        <div class="text-xs text-gray-400">提出者: ${proposal.proposers.join(', ')}</div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="text-xs text-gray-500 mb-2">当前代码</div>
+                            <pre class="bg-[#0f0f15] p-3 rounded border border-[#2a2a3a] text-gray-400 overflow-auto h-64">${this.escapeHtml(currentCode)}</pre>
+                        </div>
+                        <div>
+                            <div class="text-xs text-green-400 mb-2">建议修改</div>
+                            <pre class="bg-green-500/5 p-3 rounded border border-green-500/30 text-green-300 overflow-auto h-64">${this.escapeHtml(proposal.code)}</pre>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('consensusModal').classList.remove('hidden');
+                
+                // 也在讨论室显示
+                this.addDiscussionMessage('system', '🎉 达成共识', `
+                    <div class="text-green-400 font-bold">${proposal.proposers.join('、')} 等 ${proposal.votes} 个AI一致通过修改方案</div>
+                    <div class="mt-2 text-xs text-gray-300">请查看上方弹窗确认是否应用此变更</div>
+                `);
+            },
+
+            endDiscussion() {
+                AppState.discussionActive = false;
+                document.getElementById('discussionStatus').textContent = AppState.discussionTurn >= AppState.maxTurns ? '已达到最大回合数' : '讨论结束';
+                document.getElementById('pauseBtn').classList.add('hidden');
+                
+                if (!AppState.consensusProposal || AppState.consensusProposal.votes < 2) {
+                    this.addDiscussionMessage('system', 'ℹ️ 讨论结束', '未达成共识。AI们观点不一，请自行判断或重新开始讨论。');
+                }
+            },
+
+            pauseDiscussion() {
+                AppState.discussionActive = !AppState.discussionActive;
+                const btn = document.getElementById('pauseBtn');
+                if (AppState.discussionActive) {
+                    btn.innerHTML = '<i class="fas fa-pause mr-1"></i>暂停';
+                    document.getElementById('discussionStatus').textContent = '讨论进行中...';
+                    // 恢复讨论
+                    const topic = document.getElementById('topicInput').value;
+                    const code = AppState.editor.getValue();
+                    const language = document.getElementById('languageSelect').value;
+                    this.runDiscussionRound(topic, code, language);
+                } else {
+                    btn.innerHTML = '<i class="fas fa-play mr-1"></i>继续';
+                    document.getElementById('discussionStatus').textContent = '已暂停';
+                }
+            },
+
+            // 共识操作
+            acceptConsensus() {
+                if (AppState.consensusProposal) {
+                    AppState.editor.setValue(AppState.consensusProposal.code);
+                    this.saveFile();
+                    this.log('已应用AI共识方案', 'success');
+                    this.showToast('已应用共识方案');
+                    this.closeConsensusModal();
+                    if (AppState.previewVisible) this.updatePreview();
+                }
+            },
+
+            rejectConsensus() {
+                this.log('已拒绝AI共识方案', 'info');
+                this.closeConsensusModal();
+                // 继续讨论或结束
+                if (AppState.discussionTurn < AppState.maxTurns) {
+                    const topic = document.getElementById('topicInput').value;
+                    const code = AppState.editor.getValue();
+                    const language = document.getElementById('languageSelect').value;
+                    AppState.consensusProposal = null;
+                    this.runDiscussionRound(topic, code, language);
+                }
+            },
+
+            closeConsensusModal() {
+                document.getElementById('consensusModal').classList.add('hidden');
+            },
+
+            // API调用
             async callAI(provider, messages) {
-                const cfg = this.apiConfigs[provider];
+                const cfg = AppState.apiConfigs[provider];
                 if (!cfg?.key) throw new Error('未配置API Key');
 
-                // OpenAI兼容格式
-                if (['openai', 'deepseek', 'moonshot', 'zhipu', 'alibaba'].includes(provider)) {
+                if (['openai', 'deepseek', 'moonshot', 'zhipu', 'alibaba', 'baichuan'].includes(provider)) {
                     const rsp = await fetch(`${cfg.baseUrl}/chat/completions`, {
                         method: 'POST',
                         headers: {
@@ -412,17 +964,16 @@
                         body: JSON.stringify({
                             model: cfg.model,
                             messages: messages,
-                            temperature: 0.7
+                            temperature: 0.8,
+                            max_tokens: 500
                         })
                     });
                     
                     if (!rsp.ok) throw new Error(`HTTP ${rsp.status}`);
                     const data = await rsp.json();
                     return data.choices[0].message.content;
-                }
-                
-                // Claude格式
-                if (provider === 'claude') {
+                    
+                } else if (provider === 'claude') {
                     const rsp = await fetch(`${cfg.baseUrl}/messages`, {
                         method: 'POST',
                         headers: {
@@ -432,7 +983,7 @@
                         },
                         body: JSON.stringify({
                             model: cfg.model,
-                            max_tokens: 4096,
+                            max_tokens: 500,
                             messages: messages.filter(m => m.role !== 'system').map(m => ({
                                 role: m.role === 'assistant' ? 'assistant' : 'user',
                                 content: m.content
@@ -444,20 +995,21 @@
                     const data = await rsp.json();
                     return data.content[0].text;
                 }
-
+                
                 throw new Error('不支持的提供商');
             },
 
+            // UI组件
             addTypingIndicator(id, ai) {
                 const container = document.getElementById('discussionHistory');
                 const div = document.createElement('div');
                 div.id = id;
-                div.className = 'flex gap-3 items-start';
+                div.className = 'flex gap-3 items-start ml-4';
                 div.innerHTML = `
-                    <div class="ai-avatar bg-${ai.color}-500/20 text-${ai.color}-400"><i class="fas fa-robot"></i></div>
+                    <div class="ai-avatar bg-${ai.color}-500/20 text-${ai.color}-400 text-xs">${ai.avatar}</div>
                     <div class="flex-1">
                         <div class="text-xs text-${ai.color}-400 font-semibold mb-1">${ai.name} 思考中...</div>
-                        <div class="discussion-bubble message-ai">
+                        <div class="message-ai rounded-lg p-3 inline-block">
                             <div class="typing-indicator"><span></span><span></span><span></span></div>
                         </div>
                     </div>
@@ -471,10 +1023,9 @@
                 if (el) el.remove();
             },
 
-            addDiscussionMessage(id, name, content, color = 'purple') {
+            addDiscussionMessage(id, name, content, color, turn = null) {
                 const container = document.getElementById('discussionHistory');
                 const div = document.createElement('div');
-                div.className = 'flex gap-3 items-start animate-[fadeIn_0.3s_ease-out]';
                 
                 let avatar, bubbleClass;
                 if (id === 'system') {
@@ -484,51 +1035,23 @@
                     avatar = '<div class="ai-avatar bg-red-500/20 text-red-400"><i class="fas fa-exclamation"></i></div>';
                     bubbleClass = 'message-system';
                 } else {
-                    avatar = `<div class="ai-avatar bg-${color}-500/20 text-${color}-400"><i class="fas fa-robot"></i></div>`;
+                    const cfg = AppState.apiConfigs[id];
+                    const avatarText = cfg ? cfg.avatar : 'AI';
+                    avatar = `<div class="ai-avatar bg-${color}-500/20 text-${color}-400 text-xs">${avatarText}</div>`;
                     bubbleClass = 'message-ai';
                 }
                 
+                const turnBadge = turn ? `<span class="ml-2 text-[10px] bg-white/10 px-2 py-0.5 rounded">第${turn}轮</span>` : '';
+                
+                div.className = 'flex gap-3 items-start animate-[fadeIn_0.3s_ease-out] ml-4';
                 div.innerHTML = `
                     ${avatar}
                     <div class="flex-1 min-w-0">
-                        <div class="text-xs font-semibold mb-1 text-${color}-400">${name}</div>
-                        <div class="discussion-bubble ${bubbleClass} text-xs text-gray-200 leading-relaxed">${content}</div>
-                    </div>
-                `;
-                
-                container.appendChild(div);
-                container.scrollTop = container.scrollHeight;
-                
-                // 显示新消息徽章
-                if (!document.getElementById('discussion').classList.contains('hidden')) {
-                    const badge = document.getElementById('discussionBadge');
-                    if (badge) badge.classList.remove('hidden');
-                }
-            },
-
-            // AI建议的操作卡片
-            addActionCard(ai, suggestedCode, reason) {
-                const container = document.getElementById('discussionHistory');
-                const div = document.createElement('div');
-                div.className = 'flex gap-3 items-start ml-8';
-                
-                div.innerHTML = `
-                    <div class="flex-1">
-                        <div class="discussion-bubble message-action">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-green-400 font-bold text-xs"><i class="fas fa-code-branch mr-1"></i>代码变更建议</span>
-                                <span class="text-xs text-gray-400">来自 ${ai.name}</span>
-                            </div>
-                            <div class="text-xs text-gray-300 mb-3">${reason}</div>
-                            <div class="flex gap-2">
-                                <button onclick="app.previewChange('${ai.id}', \`${this.escapeHtml(suggestedCode)}\`, '${ai.name}')" class="flex-1 py-1.5 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 text-xs hover:bg-cyan-500/30">
-                                    <i class="fas fa-eye mr-1"></i>查看差异
-                                </button>
-                                <button onclick="app.quickApply('${ai.id}', \`${this.escapeHtml(suggestedCode)}\`)" class="flex-1 py-1.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-xs hover:bg-green-500/30">
-                                    <i class="fas fa-check mr-1"></i>直接应用
-                                </button>
-                            </div>
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-semibold text-${color}-400">${name}</span>
+                            ${turnBadge}
                         </div>
+                        <div class="${bubbleClass} rounded-lg p-3 text-xs text-gray-200 leading-relaxed whitespace-pre-wrap">${content}</div>
                     </div>
                 `;
                 
@@ -537,166 +1060,46 @@
             },
 
             escapeHtml(text) {
-                return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/"/g, '\\"');
-            },
-
-            unescapeHtml(text) {
-                return text.replace(/\\"/g, '"').replace(/\\`/g, '`').replace(/\\\\/g, '\\');
-            },
-
-            // 预览变更
-            previewChange(aiId, code, aiName) {
-                this.pendingChange = { aiId, code: this.unescapeHtml(code), aiName };
-                const currentCode = this.editor.getValue();
-                const newCode = this.unescapeHtml(code);
-                
-                // 生成简单的diff显示
-                const diffHtml = this.generateDiff(currentCode, newCode);
-                
-                document.getElementById('diffAuthor').textContent = aiName;
-                document.getElementById('diffContent').innerHTML = diffHtml;
-                document.getElementById('diffModal').classList.remove('hidden');
-            },
-
-            closeDiffModal() {
-                document.getElementById('diffModal').classList.add('hidden');
-                this.pendingChange = null;
-            },
-
-            generateDiff(oldCode, newCode) {
-                const oldLines = oldCode.split('\n');
-                const newLines = newCode.split('\n');
-                let html = '<div class="space-y-1">';
-                
-                // 简化的diff算法
-                const maxLen = Math.max(oldLines.length, newLines.length);
-                for (let i = 0; i < maxLen; i++) {
-                    const oldLine = oldLines[i] || '';
-                    const newLine = newLines[i] || '';
-                    const lineNum = i + 1;
-                    
-                    if (oldLine === newLine) {
-                        html += `<div class="flex"><span class="text-gray-500 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-gray-300">${this.escapeForDisplay(oldLine)}</span></div>`;
-                    } else if (!oldLine && newLine) {
-                        html += `<div class="flex diff-added"><span class="text-green-400 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-green-300">+ ${this.escapeForDisplay(newLine)}</span></div>`;
-                    } else if (oldLine && !newLine) {
-                        html += `<div class="flex diff-removed"><span class="text-red-400 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-red-300">- ${this.escapeForDisplay(oldLine)}</span></div>`;
-                    } else {
-                        html += `<div class="flex diff-removed"><span class="text-red-400 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-red-300">- ${this.escapeForDisplay(oldLine)}</span></div>`;
-                        html += `<div class="flex diff-added"><span class="text-green-400 w-8 text-right pr-2 select-none">*</span><span class="text-green-300">+ ${this.escapeForDisplay(newLine)}</span></div>`;
-                    }
-                }
-                
-                html += '</div>';
-                return html;
-            },
-
-            escapeForDisplay(text) {
                 return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             },
 
-            acceptChange() {
-                if (this.pendingChange) {
-                    this.editor.setValue(this.pendingChange.code);
-                    this.log(`已应用 ${this.pendingChange.aiName} 的代码变更`, 'success');
-                    this.addDiscussionMessage('system', '✅ 变更已应用', `代码已更新，由 ${this.pendingChange.aiName} 提供`);
-                    this.closeDiffModal();
-                }
-            },
-
-            rejectChange() {
-                this.log('已拒绝AI代码变更', 'info');
-                this.closeDiffModal();
-            },
-
-            quickApply(aiId, code) {
-                const realCode = this.unescapeHtml(code);
-                this.editor.setValue(realCode);
-                const aiName = this.apiConfigs[aiId]?.name || 'AI';
-                this.log(`已快速应用 ${aiName} 的变更`, 'success');
-                this.addDiscussionMessage('system', '✅ 快速应用', `代码已直接更新，由 ${aiName} 提供`);
-            },
-
-            // 基础功能
-            runCode() {
-                const code = this.editor.getValue();
-                this.switchPanel('terminal');
-                this.log('运行 JavaScript...', 'info');
-                try {
-                    const logs = [];
-                    const mockLog = (...args) => logs.push(args.join(' '));
-                    new Function('console', code.replace(/console\.log/g, 'mockLog'))({ log: mockLog, error: mockLog });
-                    logs.forEach(l => this.log(l, 'success'));
-                } catch (e) {
-                    this.log(e.message, 'error');
-                }
-            },
-
-            switchPanel(name) {
-                document.querySelectorAll('.panel-section').forEach(el => el.classList.add('hidden'));
-                document.getElementById(name).classList.remove('hidden');
-                document.querySelectorAll('.panel-tab').forEach(el => {
-                    el.classList.remove('text-cyan-400', 'font-semibold');
-                    el.classList.add('text-gray-400');
-                });
-                document.querySelector(`[data-panel="${name}"]`).classList.add('text-cyan-400', 'font-semibold');
-                
-                if (name === 'discussion') {
-                    document.getElementById('discussionBadge').classList.add('hidden');
-                }
-            },
-
-            toggleAIPanel() {
-                const panel = document.getElementById('aiPanel');
-                const isHidden = panel.classList.contains('translate-x-full');
-                panel.classList.toggle('translate-x-full', !isHidden);
-            },
-
+            // 工具
             log(msg, type = 'info') {
                 const term = document.getElementById('terminal');
+                if (!term) return;
                 const div = document.createElement('div');
                 div.className = `console-line console-${type}`;
-                div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                div.innerHTML = `<span class="text-gray-600">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
                 term.appendChild(div);
                 term.scrollTop = term.scrollHeight;
             },
 
-            renderFileTree() {
-                const container = document.getElementById('fileTree');
-                container.innerHTML = '';
-                this.files.forEach((file, name) => {
-                    const div = document.createElement('div');
-                    div.className = `px-3 py-2 cursor-pointer hover:bg-white/5 ${this.currentFile === name ? 'bg-white/10 border-l-2 border-cyan-400' : ''}`;
-                    div.textContent = name;
-                    div.onclick = () => this.openFile(name);
-                    container.appendChild(div);
-                });
+            showToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-lg shadow-2xl z-50 text-sm font-bold animate-[fadeIn_0.3s_ease-out]';
+                toast.innerHTML = `<i class="fas fa-check-circle mr-2"></i>${message}`;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.5s';
+                    setTimeout(() => toast.remove(), 500);
+                }, 3000);
             },
 
-            renderTabs() {
-                const container = document.getElementById('tabBar');
-                container.innerHTML = '';
-                this.files.forEach((file, name) => {
-                    const div = document.createElement('div');
-                    div.className = `px-4 py-2 border-r border-[#2a2a3a] cursor-pointer ${this.currentFile === name ? 'bg-[#252532] border-t-2 border-t-cyan-400 text-white' : 'text-gray-400'}`;
-                    div.textContent = name;
-                    div.onclick = () => this.openFile(name);
-                    container.appendChild(div);
+            switchPanel(name) {
+                document.querySelectorAll('.panel-section').forEach(el => el.classList.add('hidden'));
+                const target = document.getElementById(name);
+                if (target) target.classList.remove('hidden');
+                
+                document.querySelectorAll('.panel-tab').forEach(el => {
+                    el.classList.remove('text-cyan-400', 'font-semibold');
+                    el.classList.add('text-gray-400');
                 });
-            },
-
-            openFile(name) {
-                const file = this.files.get(name);
-                if (file) {
-                    this.currentFile = name;
-                    this.editor.setValue(file.content);
-                    this.renderFileTree();
-                    this.renderTabs();
+                const tab = document.querySelector(`[data-panel="${name}"]`);
+                if (tab) {
+                    tab.classList.add('text-cyan-400', 'font-semibold');
+                    tab.classList.remove('text-gray-400');
                 }
-            },
-
-            changeLanguage(lang) {
-                monaco.editor.setModelLanguage(this.editor.getModel(), lang);
             }
         };
 
