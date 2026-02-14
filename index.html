@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate IDE - AI协作编程</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/editor/editor.main.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap');
+        
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-panel: #15151e;
+            --accent-cyan: #00f0ff;
+            --accent-purple: #b829dd;
+            --accent-green: #00ff9d;
+            --accent-red: #ff4444;
+            --border-color: #2a2a3a;
+        }
+        
+        body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: #e0e0e0; overflow: hidden; }
+        .code-font { font-family: 'JetBrains Mono', monospace; }
+        
+        .message-user { background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(0, 240, 255, 0.05)); border: 1px solid rgba(0, 240, 255, 0.3); }
+        .message-ai { background: linear-gradient(135deg, rgba(184, 41, 221, 0.15), rgba(184, 41, 221, 0.05)); border: 1px solid rgba(184, 41, 221, 0.3); }
+        .message-system { background: rgba(255, 107, 53, 0.15); border: 1px solid rgba(255, 107, 53, 0.3); }
+        .message-action { background: rgba(0, 255, 157, 0.15); border: 1px solid rgba(0, 255, 157, 0.3); }
+        
+        .typing-indicator span { animation: blink 1.4s infinite both; display: inline-block; width: 6px; height: 6px; background: var(--accent-cyan); border-radius: 50%; margin: 0 2px; }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+        
+        .scroll-hide::-webkit-scrollbar { width: 6px; height: 6px; }
+        .scroll-hide::-webkit-scrollbar-track { background: transparent; }
+        .scroll-hide::-webkit-scrollbar-thumb { background: #3a3a4a; border-radius: 3px; }
+        
+        .diff-added { background: rgba(0, 255, 157, 0.2); color: #00ff9d; }
+        .diff-removed { background: rgba(255, 68, 68, 0.2); color: #ff4444; }
+        
+        .ai-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        
+        .config-card { transition: all 0.2s; cursor: pointer; }
+        .config-card:hover { transform: translateX(4px); border-color: rgba(0, 240, 255, 0.5); }
+        
+        .code-block { background: #0f0f15; border: 1px solid #2a2a3a; border-radius: 6px; padding: 8px; margin: 8px 0; font-family: 'JetBrains Mono', monospace; font-size: 11px; overflow-x: auto; }
+        
+        .btn-accept { background: rgba(0, 255, 157, 0.2); border: 1px solid rgba(0, 255, 157, 0.5); color: #00ff9d; }
+        .btn-accept:hover { background: rgba(0, 255, 157, 0.3); }
+        .btn-reject { background: rgba(255, 68, 68, 0.2); border: 1px solid rgba(255, 68, 68, 0.5); color: #ff4444; }
+        .btn-reject:hover { background: rgba(255, 68, 68, 0.3); }
+        
+        .discussion-bubble { border-radius: 12px; padding: 12px; margin: 4px 0; }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-sm">
+
+    <!-- 顶部 -->
+    <header class="h-12 bg-[#0f0f15] border-b border-[#2a2a3a] flex items-center justify-between px-4 z-50">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-cube text-cyan-400 text-xl"></i>
+                <span class="font-bold text-lg bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">AI协作IDE</span>
+            </div>
+            <button onclick="app.runCode()" class="px-4 py-1.5 bg-cyan-500/20 border border-cyan-500/30 rounded flex items-center gap-2 hover:bg-cyan-500/30">
+                <i class="fas fa-play text-green-400"></i> 运行
+            </button>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <select id="languageSelect" onchange="app.changeLanguage(this.value)" class="bg-[#1a1a23] border border-[#2a2a3a] rounded px-3 py-1.5 text-xs code-font">
+                <option value="javascript">JavaScript</option>
+                <option value="python">Python</option>
+                <option value="java">Java</option>
+                <option value="cpp">C++</option>
+                <option value="go">Go</option>
+            </select>
+            <button onclick="app.toggleAIPanel()" class="px-3 py-1.5 bg-purple-500/20 border border-purple-500/30 rounded text-purple-400">
+                <i class="fas fa-robot"></i> AI配置
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- 文件树 -->
+        <aside class="w-56 bg-[#0f0f15] border-r border-[#2a2a3a] flex flex-col">
+            <div class="p-3 border-b border-[#2a2a3a] font-bold text-xs text-gray-400">文件</div>
+            <div id="fileTree" class="flex-1 overflow-y-auto scroll-hide p-2"></div>
+        </aside>
+
+        <!-- 编辑器 -->
+        <div class="flex-1 flex flex-col min-w-0">
+            <div id="tabBar" class="h-9 bg-[#15151e] border-b border-[#2a2a3a] flex overflow-x-auto scroll-hide"></div>
+            <div id="editorContainer" class="flex-1 relative"></div>
+            
+            <!-- 底部面板 -->
+            <div class="h-64 bg-[#0f0f15] border-t border-[#2a2a3a] flex flex-col">
+                <div class="flex items-center gap-4 px-4 py-2 border-b border-[#2a2a3a] text-xs bg-[#15151e]">
+                    <button onclick="app.switchPanel('terminal')" class="panel-tab text-cyan-400 font-semibold" data-panel="terminal">
+                        <i class="fas fa-terminal mr-1"></i>终端
+                    </button>
+                    <button onclick="app.switchPanel('discussion')" class="panel-tab text-gray-400 hover:text-gray-300 flex items-center gap-2" data-panel="discussion">
+                        <i class="fas fa-users"></i> 
+                        <span>AI讨论室</span>
+                        <span id="discussionBadge" class="hidden px-1.5 py-0.5 bg-red-500 rounded text-[10px] text-white">新</span>
+                    </button>
+                </div>
+                
+                <div id="panelContent" class="flex-1 overflow-hidden relative">
+                    <!-- 终端 -->
+                    <div id="terminal" class="panel-section h-full overflow-y-auto scroll-hide p-3 code-font text-xs"></div>
+                    
+                    <!-- AI讨论室 -->
+                    <div id="discussion" class="panel-section hidden h-full flex flex-col">
+                        <!-- 讨论历史 -->
+                        <div id="discussionHistory" class="flex-1 overflow-y-auto scroll-hide p-3 space-y-3"></div>
+                        
+                        <!-- 输入区 -->
+                        <div class="p-3 border-t border-[#2a2a3a] bg-[#15151e]">
+                            <div class="flex gap-2 mb-2">
+                                <input type="text" id="topicInput" placeholder="输入讨论主题（如：优化这段代码的性能、重构建议、Bug排查...）" 
+                                    class="flex-1 bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 text-xs focus:outline-none focus:border-cyan-500"
+                                    onkeypress="if(event.key==='Enter') app.startDiscussion()">
+                                <button onclick="app.startDiscussion()" class="px-4 py-2 bg-gradient-to-r from-purple-500 to-cyan-500 rounded text-white font-bold text-xs hover:opacity-90">
+                                    <i class="fas fa-comments mr-1"></i>开始讨论
+                                </button>
+                            </div>
+                            <div class="flex items-center justify-between text-xs text-gray-500">
+                                <span id="configuredAIs">已配置: 0 个AI</span>
+                                <span>AI可以直接修改代码，变更需你确认</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧面板 -->
+        <aside id="aiPanel" class="w-96 bg-[#0f0f15] border-l border-[#2a2a3a] flex flex-col transition-transform duration-300 translate-x-full fixed right-0 top-12 bottom-0 z-40">
+            <div class="p-4 border-b border-[#2a2a3a] flex items-center justify-between">
+                <h3 class="font-bold text-purple-400"><i class="fas fa-cog mr-2"></i>API配置</h3>
+                <button onclick="app.toggleAIPanel()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto scroll-hide p-4 space-y-3" id="apiConfigList"></div>
+        </aside>
+    </div>
+
+    <!-- API配置弹窗 -->
+    <div id="apiModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+        <div class="bg-[#15151e] border border-[#2a2a3a] rounded-lg p-6 w-[450px]">
+            <h3 class="text-lg font-bold mb-4 text-cyan-400" id="modalTitle">配置API</h3>
+            <input type="password" id="apiKeyInput" placeholder="输入API Key..." class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 mb-3 text-sm focus:border-cyan-500 outline-none">
+            <input type="text" id="apiUrlInput" placeholder="Base URL (可选)" class="w-full bg-[#0f0f15] border border-[#2a2a3a] rounded px-3 py-2 mb-4 text-sm focus:border-cyan-500 outline-none text-gray-400">
+            <div class="flex gap-3">
+                <button onclick="app.closeApiModal()" class="flex-1 py-2 border border-[#2a2a3a] rounded hover:bg-white/5">取消</button>
+                <button onclick="app.saveApiConfig()" class="flex-1 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 hover:bg-cyan-500/30">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 代码变更确认弹窗 -->
+    <div id="diffModal" class="hidden fixed inset-0 bg-black/90 z-[60] flex items-center justify-center">
+        <div class="bg-[#15151e] border border-[#2a2a3a] rounded-lg w-[800px] h-[600px] flex flex-col">
+            <div class="p-4 border-b border-[#2a2a3a] flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-lg text-cyan-400">AI建议的代码变更</h3>
+                    <p class="text-xs text-gray-400 mt-1">来自: <span id="diffAuthor" class="text-purple-400"></span></p>
+                </div>
+                <button onclick="app.closeDiffModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="flex-1 overflow-auto p-4 code-font text-xs" id="diffContent"></div>
+            <div class="p-4 border-t border-[#2a2a3a] flex justify-end gap-3">
+                <button onclick="app.rejectChange()" class="px-6 py-2 btn-reject rounded font-bold"><i class="fas fa-times mr-2"></i>拒绝</button>
+                <button onclick="app.acceptChange()" class="px-6 py-2 btn-accept rounded font-bold"><i class="fas fa-check mr-2"></i>应用变更</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const app = {
+            editor: null,
+            currentFile: null,
+            files: new Map(),
+            currentEditingProvider: null,
+            pendingChange: null, // 待确认的代码变更
+            
+            apiConfigs: {
+                openai: { name: 'OpenAI GPT-4', key: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4', color: 'green' },
+                claude: { name: 'Claude 3.5', key: '', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20241022', color: 'orange' },
+                deepseek: { name: 'DeepSeek', key: '', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', color: 'blue' },
+                moonshot: { name: 'Kimi', key: '', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k', color: 'purple' },
+                zhipu: { name: '智谱GLM-4', key: '', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4', color: 'cyan' },
+                alibaba: { name: '通义千问', key: '', baseUrl: 'https://dashscope.aliyuncs.com/api/v1', model: 'qwen-turbo', color: 'orange' }
+            },
+
+            init() {
+                this.loadConfigs();
+                this.initEditor();
+                this.initFiles();
+                this.renderApiList();
+                this.updateConfiguredCount();
+                this.log('系统就绪。配置API后，在下方讨论室输入主题开始AI协作。', 'success');
+            },
+
+            loadConfigs() {
+                try {
+                    const saved = localStorage.getItem('ide_api_configs');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        Object.keys(parsed).forEach(k => {
+                            if (this.apiConfigs[k]) {
+                                this.apiConfigs[k].key = parsed[k].key || '';
+                                if (parsed[k].baseUrl) this.apiConfigs[k].baseUrl = parsed[k].baseUrl;
+                            }
+                        });
+                    }
+                } catch(e) { console.error(e); }
+            },
+
+            saveConfigs() {
+                localStorage.setItem('ide_api_configs', JSON.stringify(this.apiConfigs));
+            },
+
+            initEditor() {
+                require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs' }});
+                require(['vs/editor/editor.main'], () => {
+                    this.editor = monaco.editor.create(document.getElementById('editorContainer'), {
+                        value: '// 示例代码：斐波那契数列\nfunction fibonacci(n) {\n    if (n <= 1) return n;\n    return fibonacci(n - 1) + fibonacci(n - 2);\n}\n\n// 测试\nfor (let i = 0; i < 10; i++) {\n    console.log(fibonacci(i));\n}',
+                        language: 'javascript',
+                        theme: 'vs-dark',
+                        fontSize: 14,
+                        fontFamily: 'JetBrains Mono',
+                        minimap: { enabled: true },
+                        automaticLayout: true
+                    });
+                });
+            },
+
+            initFiles() {
+                this.files.set('main.js', { name: 'main.js', language: 'javascript', content: this.editor ? this.editor.getValue() : '' });
+                this.currentFile = 'main.js';
+                this.renderFileTree();
+                this.renderTabs();
+            },
+
+            renderApiList() {
+                const container = document.getElementById('apiConfigList');
+                if (!container) return;
+                container.innerHTML = '';
+                
+                Object.entries(this.apiConfigs).forEach(([key, cfg]) => {
+                    const isCfg = cfg.key && cfg.key.length > 0;
+                    const div = document.createElement('div');
+                    div.className = `config-card p-3 rounded-lg border ${isCfg ? 'border-green-500/30 bg-green-500/5' : 'border-[#2a2a3a] bg-[#1a1a23]'} flex justify-between items-center`;
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <div class="w-2 h-2 rounded-full ${isCfg ? 'bg-green-400' : 'bg-red-400'}"></div>
+                            <div>
+                                <div class="text-sm font-medium ${isCfg ? 'text-green-400' : 'text-gray-400'}">${cfg.name}</div>
+                                <div class="text-[10px] text-gray-500">${isCfg ? '已配置' : '未配置'}</div>
+                            </div>
+                        </div>
+                        <button onclick="app.openApiModal('${key}')" class="px-3 py-1 rounded text-xs ${isCfg ? 'bg-green-500/20 text-green-400' : 'bg-cyan-500/20 text-cyan-400'} border border-current opacity-80 hover:opacity-100">
+                            ${isCfg ? '修改' : '配置'}
+                        </button>
+                    `;
+                    container.appendChild(div);
+                });
+            },
+
+            openApiModal(key) {
+                this.currentEditingProvider = key;
+                const cfg = this.apiConfigs[key];
+                document.getElementById('modalTitle').textContent = `配置 ${cfg.name}`;
+                document.getElementById('apiKeyInput').value = cfg.key || '';
+                document.getElementById('apiUrlInput').value = cfg.baseUrl || '';
+                document.getElementById('apiModal').classList.remove('hidden');
+            },
+
+            closeApiModal() {
+                document.getElementById('apiModal').classList.add('hidden');
+                this.currentEditingProvider = null;
+            },
+
+            saveApiConfig() {
+                if (!this.currentEditingProvider) return;
+                const key = document.getElementById('apiKeyInput').value.trim();
+                const url = document.getElementById('apiUrlInput').value.trim();
+                
+                this.apiConfigs[this.currentEditingProvider].key = key;
+                if (url) this.apiConfigs[this.currentEditingProvider].baseUrl = url;
+                
+                this.saveConfigs();
+                this.renderApiList();
+                this.updateConfiguredCount();
+                this.closeApiModal();
+                this.log(`已保存 ${this.apiConfigs[this.currentEditingProvider].name} 配置`, 'success');
+            },
+
+            updateConfiguredCount() {
+                const count = Object.values(this.apiConfigs).filter(c => c.key && c.key.length > 0).length;
+                const el = document.getElementById('configuredAIs');
+                if (el) el.textContent = `已配置: ${count} 个AI`;
+            },
+
+            getConfiguredAIs() {
+                return Object.entries(this.apiConfigs)
+                    .filter(([_, c]) => c.key && c.key.length > 0)
+                    .map(([k, c]) => ({ id: k, ...c }));
+            },
+
+            // 核心：开始讨论
+            async startDiscussion() {
+                const topicInput = document.getElementById('topicInput');
+                const topic = topicInput.value.trim();
+                
+                if (!topic) {
+                    alert('请输入讨论主题');
+                    return;
+                }
+
+                const configured = this.getConfiguredAIs();
+                if (configured.length === 0) {
+                    this.addDiscussionMessage('system', '⚠️ 错误', '请先配置至少一个AI的API Key。点击右上角的"AI配置"按钮。');
+                    this.switchPanel('discussion');
+                    return;
+                }
+
+                const code = this.editor.getValue();
+                const language = document.getElementById('languageSelect').value;
+                
+                this.switchPanel('discussion');
+                topicInput.value = '';
+                
+                // 系统消息
+                this.addDiscussionMessage('system', '🚀 开始多AI协作讨论', 
+                    `<div class="text-cyan-400 font-bold mb-1">主题: ${topic}</div>
+                     <div class="text-xs text-gray-400">参与AI: ${configured.map(a => `<span class="text-${a.color}-400">${a.name}</span>`).join(', ')}</div>
+                     <div class="text-xs text-gray-500 mt-1">当前代码长度: ${code.length} 字符</div>`
+                );
+
+                // 并行调用所有AI
+                const messages = [
+                    { role: 'system', content: `你是专业程序员。针对用户的代码和话题，请：
+1. 先分析代码现状
+2. 给出具体建议
+3. 如果建议涉及代码修改，必须输出完整的修改后代码块，用 \`\`\`${language} 包裹
+4. 保持简洁，中文回答` },
+                    { role: 'user', content: `讨论主题: ${topic}\n\n当前代码:\n\`\`\`${language}\n${code}\n\`\`\`` }
+                ];
+
+                configured.forEach((ai, idx) => {
+                    setTimeout(() => {
+                        this.callAIForDiscussion(ai, messages, topic);
+                    }, idx * 800);
+                });
+            },
+
+            async callAIForDiscussion(ai, messages, topic) {
+                // 显示输入中
+                const typingId = `typing-${ai.id}-${Date.now()}`;
+                this.addTypingIndicator(typingId, ai);
+
+                try {
+                    const content = await this.callAI(ai.id, messages);
+                    this.removeTypingIndicator(typingId);
+                    
+                    // 解析AI回复，检查是否包含代码
+                    const codeBlockMatch = content.match(/```[\w]*\n([\s\S]*?)```/);
+                    const hasCode = codeBlockMatch && codeBlockMatch[1];
+                    
+                    // 提取文字部分（去掉代码块）
+                    let textContent = content.replace(/```[\w]*\n[\s\S]*?```/g, '[代码建议见下方]').trim();
+                    
+                    // 添加AI消息
+                    this.addDiscussionMessage(ai.id, ai.name, textContent, ai.color);
+                    
+                    // 如果有代码建议，添加操作卡片
+                    if (hasCode) {
+                        const suggestedCode = codeBlockMatch[1].trim();
+                        const currentCode = this.editor.getValue();
+                        
+                        // 检查是否真的不同
+                        if (suggestedCode !== currentCode) {
+                            setTimeout(() => {
+                                this.addActionCard(ai, suggestedCode, textContent || '代码优化建议');
+                            }, 500);
+                        }
+                    }
+                    
+                } catch (err) {
+                    this.removeTypingIndicator(typingId);
+                    this.addDiscussionMessage('error', ai.name, `<span class="text-red-400">错误: ${err.message}</span>`);
+                }
+            },
+
+            async callAI(provider, messages) {
+                const cfg = this.apiConfigs[provider];
+                if (!cfg?.key) throw new Error('未配置API Key');
+
+                // OpenAI兼容格式
+                if (['openai', 'deepseek', 'moonshot', 'zhipu', 'alibaba'].includes(provider)) {
+                    const rsp = await fetch(`${cfg.baseUrl}/chat/completions`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${cfg.key}`
+                        },
+                        body: JSON.stringify({
+                            model: cfg.model,
+                            messages: messages,
+                            temperature: 0.7
+                        })
+                    });
+                    
+                    if (!rsp.ok) throw new Error(`HTTP ${rsp.status}`);
+                    const data = await rsp.json();
+                    return data.choices[0].message.content;
+                }
+                
+                // Claude格式
+                if (provider === 'claude') {
+                    const rsp = await fetch(`${cfg.baseUrl}/messages`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': cfg.key,
+                            'anthropic-version': '2023-06-01'
+                        },
+                        body: JSON.stringify({
+                            model: cfg.model,
+                            max_tokens: 4096,
+                            messages: messages.filter(m => m.role !== 'system').map(m => ({
+                                role: m.role === 'assistant' ? 'assistant' : 'user',
+                                content: m.content
+                            }))
+                        })
+                    });
+                    
+                    if (!rsp.ok) throw new Error(`HTTP ${rsp.status}`);
+                    const data = await rsp.json();
+                    return data.content[0].text;
+                }
+
+                throw new Error('不支持的提供商');
+            },
+
+            addTypingIndicator(id, ai) {
+                const container = document.getElementById('discussionHistory');
+                const div = document.createElement('div');
+                div.id = id;
+                div.className = 'flex gap-3 items-start';
+                div.innerHTML = `
+                    <div class="ai-avatar bg-${ai.color}-500/20 text-${ai.color}-400"><i class="fas fa-robot"></i></div>
+                    <div class="flex-1">
+                        <div class="text-xs text-${ai.color}-400 font-semibold mb-1">${ai.name} 思考中...</div>
+                        <div class="discussion-bubble message-ai">
+                            <div class="typing-indicator"><span></span><span></span><span></span></div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            },
+
+            removeTypingIndicator(id) {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            },
+
+            addDiscussionMessage(id, name, content, color = 'purple') {
+                const container = document.getElementById('discussionHistory');
+                const div = document.createElement('div');
+                div.className = 'flex gap-3 items-start animate-[fadeIn_0.3s_ease-out]';
+                
+                let avatar, bubbleClass;
+                if (id === 'system') {
+                    avatar = '<div class="ai-avatar bg-orange-500/20 text-orange-400"><i class="fas fa-info"></i></div>';
+                    bubbleClass = 'message-system';
+                } else if (id === 'error') {
+                    avatar = '<div class="ai-avatar bg-red-500/20 text-red-400"><i class="fas fa-exclamation"></i></div>';
+                    bubbleClass = 'message-system';
+                } else {
+                    avatar = `<div class="ai-avatar bg-${color}-500/20 text-${color}-400"><i class="fas fa-robot"></i></div>`;
+                    bubbleClass = 'message-ai';
+                }
+                
+                div.innerHTML = `
+                    ${avatar}
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-semibold mb-1 text-${color}-400">${name}</div>
+                        <div class="discussion-bubble ${bubbleClass} text-xs text-gray-200 leading-relaxed">${content}</div>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+                
+                // 显示新消息徽章
+                if (!document.getElementById('discussion').classList.contains('hidden')) {
+                    const badge = document.getElementById('discussionBadge');
+                    if (badge) badge.classList.remove('hidden');
+                }
+            },
+
+            // AI建议的操作卡片
+            addActionCard(ai, suggestedCode, reason) {
+                const container = document.getElementById('discussionHistory');
+                const div = document.createElement('div');
+                div.className = 'flex gap-3 items-start ml-8';
+                
+                div.innerHTML = `
+                    <div class="flex-1">
+                        <div class="discussion-bubble message-action">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-green-400 font-bold text-xs"><i class="fas fa-code-branch mr-1"></i>代码变更建议</span>
+                                <span class="text-xs text-gray-400">来自 ${ai.name}</span>
+                            </div>
+                            <div class="text-xs text-gray-300 mb-3">${reason}</div>
+                            <div class="flex gap-2">
+                                <button onclick="app.previewChange('${ai.id}', \`${this.escapeHtml(suggestedCode)}\`, '${ai.name}')" class="flex-1 py-1.5 bg-cyan-500/20 border border-cyan-500/50 rounded text-cyan-400 text-xs hover:bg-cyan-500/30">
+                                    <i class="fas fa-eye mr-1"></i>查看差异
+                                </button>
+                                <button onclick="app.quickApply('${ai.id}', \`${this.escapeHtml(suggestedCode)}\`)" class="flex-1 py-1.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-xs hover:bg-green-500/30">
+                                    <i class="fas fa-check mr-1"></i>直接应用
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            },
+
+            escapeHtml(text) {
+                return text.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/"/g, '\\"');
+            },
+
+            unescapeHtml(text) {
+                return text.replace(/\\"/g, '"').replace(/\\`/g, '`').replace(/\\\\/g, '\\');
+            },
+
+            // 预览变更
+            previewChange(aiId, code, aiName) {
+                this.pendingChange = { aiId, code: this.unescapeHtml(code), aiName };
+                const currentCode = this.editor.getValue();
+                const newCode = this.unescapeHtml(code);
+                
+                // 生成简单的diff显示
+                const diffHtml = this.generateDiff(currentCode, newCode);
+                
+                document.getElementById('diffAuthor').textContent = aiName;
+                document.getElementById('diffContent').innerHTML = diffHtml;
+                document.getElementById('diffModal').classList.remove('hidden');
+            },
+
+            closeDiffModal() {
+                document.getElementById('diffModal').classList.add('hidden');
+                this.pendingChange = null;
+            },
+
+            generateDiff(oldCode, newCode) {
+                const oldLines = oldCode.split('\n');
+                const newLines = newCode.split('\n');
+                let html = '<div class="space-y-1">';
+                
+                // 简化的diff算法
+                const maxLen = Math.max(oldLines.length, newLines.length);
+                for (let i = 0; i < maxLen; i++) {
+                    const oldLine = oldLines[i] || '';
+                    const newLine = newLines[i] || '';
+                    const lineNum = i + 1;
+                    
+                    if (oldLine === newLine) {
+                        html += `<div class="flex"><span class="text-gray-500 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-gray-300">${this.escapeForDisplay(oldLine)}</span></div>`;
+                    } else if (!oldLine && newLine) {
+                        html += `<div class="flex diff-added"><span class="text-green-400 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-green-300">+ ${this.escapeForDisplay(newLine)}</span></div>`;
+                    } else if (oldLine && !newLine) {
+                        html += `<div class="flex diff-removed"><span class="text-red-400 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-red-300">- ${this.escapeForDisplay(oldLine)}</span></div>`;
+                    } else {
+                        html += `<div class="flex diff-removed"><span class="text-red-400 w-8 text-right pr-2 select-none">${lineNum}</span><span class="text-red-300">- ${this.escapeForDisplay(oldLine)}</span></div>`;
+                        html += `<div class="flex diff-added"><span class="text-green-400 w-8 text-right pr-2 select-none">*</span><span class="text-green-300">+ ${this.escapeForDisplay(newLine)}</span></div>`;
+                    }
+                }
+                
+                html += '</div>';
+                return html;
+            },
+
+            escapeForDisplay(text) {
+                return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            },
+
+            acceptChange() {
+                if (this.pendingChange) {
+                    this.editor.setValue(this.pendingChange.code);
+                    this.log(`已应用 ${this.pendingChange.aiName} 的代码变更`, 'success');
+                    this.addDiscussionMessage('system', '✅ 变更已应用', `代码已更新，由 ${this.pendingChange.aiName} 提供`);
+                    this.closeDiffModal();
+                }
+            },
+
+            rejectChange() {
+                this.log('已拒绝AI代码变更', 'info');
+                this.closeDiffModal();
+            },
+
+            quickApply(aiId, code) {
+                const realCode = this.unescapeHtml(code);
+                this.editor.setValue(realCode);
+                const aiName = this.apiConfigs[aiId]?.name || 'AI';
+                this.log(`已快速应用 ${aiName} 的变更`, 'success');
+                this.addDiscussionMessage('system', '✅ 快速应用', `代码已直接更新，由 ${aiName} 提供`);
+            },
+
+            // 基础功能
+            runCode() {
+                const code = this.editor.getValue();
+                this.switchPanel('terminal');
+                this.log('运行 JavaScript...', 'info');
+                try {
+                    const logs = [];
+                    const mockLog = (...args) => logs.push(args.join(' '));
+                    new Function('console', code.replace(/console\.log/g, 'mockLog'))({ log: mockLog, error: mockLog });
+                    logs.forEach(l => this.log(l, 'success'));
+                } catch (e) {
+                    this.log(e.message, 'error');
+                }
+            },
+
+            switchPanel(name) {
+                document.querySelectorAll('.panel-section').forEach(el => el.classList.add('hidden'));
+                document.getElementById(name).classList.remove('hidden');
+                document.querySelectorAll('.panel-tab').forEach(el => {
+                    el.classList.remove('text-cyan-400', 'font-semibold');
+                    el.classList.add('text-gray-400');
+                });
+                document.querySelector(`[data-panel="${name}"]`).classList.add('text-cyan-400', 'font-semibold');
+                
+                if (name === 'discussion') {
+                    document.getElementById('discussionBadge').classList.add('hidden');
+                }
+            },
+
+            toggleAIPanel() {
+                const panel = document.getElementById('aiPanel');
+                const isHidden = panel.classList.contains('translate-x-full');
+                panel.classList.toggle('translate-x-full', !isHidden);
+            },
+
+            log(msg, type = 'info') {
+                const term = document.getElementById('terminal');
+                const div = document.createElement('div');
+                div.className = `console-line console-${type}`;
+                div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                term.appendChild(div);
+                term.scrollTop = term.scrollHeight;
+            },
+
+            renderFileTree() {
+                const container = document.getElementById('fileTree');
+                container.innerHTML = '';
+                this.files.forEach((file, name) => {
+                    const div = document.createElement('div');
+                    div.className = `px-3 py-2 cursor-pointer hover:bg-white/5 ${this.currentFile === name ? 'bg-white/10 border-l-2 border-cyan-400' : ''}`;
+                    div.textContent = name;
+                    div.onclick = () => this.openFile(name);
+                    container.appendChild(div);
+                });
+            },
+
+            renderTabs() {
+                const container = document.getElementById('tabBar');
+                container.innerHTML = '';
+                this.files.forEach((file, name) => {
+                    const div = document.createElement('div');
+                    div.className = `px-4 py-2 border-r border-[#2a2a3a] cursor-pointer ${this.currentFile === name ? 'bg-[#252532] border-t-2 border-t-cyan-400 text-white' : 'text-gray-400'}`;
+                    div.textContent = name;
+                    div.onclick = () => this.openFile(name);
+                    container.appendChild(div);
+                });
+            },
+
+            openFile(name) {
+                const file = this.files.get(name);
+                if (file) {
+                    this.currentFile = name;
+                    this.editor.setValue(file.content);
+                    this.renderFileTree();
+                    this.renderTabs();
+                }
+            },
+
+            changeLanguage(lang) {
+                monaco.editor.setModelLanguage(this.editor.getModel(), lang);
+            }
+        };
+
+        window.app = app;
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
